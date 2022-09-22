@@ -1,9 +1,11 @@
-use std::{path::Path, fs::File, io::Write};
+use std::{path::Path, fs::File, io::Write, process::Command};
 use serde::{Serialize, Deserialize};
 use diqwest::WithDigestAuth;
+extern crate ffmpeg_next as ffmpeg;
+
 
 #[derive(Serialize, Deserialize, Debug)]
-struct Speakers {
+pub struct Speakers {
     speaker: Vec<Speaker>,
 }
 
@@ -16,7 +18,7 @@ impl Speakers {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-struct Speaker {
+pub struct Speaker {
     ip: String,
     name: String,
     username: String,
@@ -52,6 +54,16 @@ async fn main() {
 
         let selected_speaker = &speakers.speaker[speaker];
 
+        //Stream or play file?
+        let mut stream_or_play = String::new();
+        println!("Stream or play file?");
+        println!("1: Stream");
+        println!("2: Play file");
+        std::io::stdin().read_line(&mut stream_or_play).unwrap();
+        let stream_or_play = stream_or_play.trim().parse::<usize>().unwrap();
+
+        if stream_or_play == 1
+        {   
         println!("Enter File Name: ");
         let mut file_name = String::new();
         std::io::stdin().read_line(&mut file_name).unwrap();
@@ -71,6 +83,11 @@ async fn main() {
         let client = reqwest::Client::new();
         let res = client.get(&url).send_with_digest_auth(&selected_speaker.username, &selected_speaker.password).await.unwrap();
         println!("Response: {} | {}", res.status(), res.text().await.unwrap());
+    }
+    else if stream_or_play == 2
+    {
+        run_ffmpeg(&selected_speaker);
+    }
     }
 
 }
@@ -146,3 +163,56 @@ async fn prompt_for_speaker_info() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 
 }
+
+
+//ffmpeg -f dshow -i "audio=マイク (USB PnP Sound Device)" -probesize 32 -analyzeduration 32 -c:a pcm_mulaw -ab 128k -ac 1 -ar 16000 -f wav -chunked_post 0 -content_type audio/axis-mulaw-128 http://root:password@172.16.29.128/axis-cgi/audio/transmit.cgi
+pub fn run_ffmpeg(speaker: &Speaker) -> Result<(), Box<dyn std::error::Error>> {
+    //let ip = speaker.ip;
+    
+    //stream audio from internal mic to speaker using cmd
+    let mut ffmpeg = Command::new("ffmpeg")
+        .arg("-f")
+        .arg("dshow")
+        .arg("-i")
+        .arg("audio=マイク (USB PnP Sound Device)")
+        .arg("-probesize")
+        .arg("32")
+        .arg("-analyzeduration")
+        .arg("32")
+        .arg("-c:a")
+        .arg("pcm_mulaw")
+        .arg("-ab")
+        .arg("128k")
+        .arg("-ac")
+        .arg("1")
+        .arg("-ar")
+        .arg("16000")
+        .arg("-f")
+        .arg("wav")
+        .arg("-chunked_post")
+        .arg("0")
+        .arg("-content_type")
+        .arg("audio/axis-mulaw-128")
+        .arg(format!("http://"));
+
+
+    Ok(())
+}
+
+
+
+    //     .input("audio=マイク (USB PnP Sound Device)")
+    //     .input_format("dshow")
+    //     .output("http://root:password@172.16.29.128/axis-cgi/audio/transmit.cgi")
+    //     .output_format("wav")
+    //     .output_option("probesize", "32")
+    //     .output_option("analyzeduration", "32")
+    //     .output_option("c:a", "pcm_mulaw")
+    //     .output_option("ab", "128k")
+    //     .output_option("ac", "1")
+    //     .output_option("ar", "16000")
+    //     .output_option("f", "wav")
+    //     .output_option("chunked_post", "0")
+    //     .output_option("content_type", "audio/axis-mulaw-128")
+    //     .run_async()?;
+    // ffmpeg.wait()?;
